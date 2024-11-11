@@ -13,12 +13,11 @@ def compute_focal_length_in_mm(camera: Camera) -> np.ndarray:
     Returns:
         np.ndarray: [fx, fy] in mm.
     """
-    raise NotImplementedError() 
     # Note(Ayush): Solution provided by project leader.
-    # pixel_to_mm_x = camera.sensor_size_x_mm / camera.image_size_x_px
-    # pixel_to_mm_y = camera.sensor_size_y_mm / camera.image_size_y_px
+    pixel_to_mm_x = camera.sensor_size_x_mm / camera.image_size_x_px
+    pixel_to_mm_y = camera.sensor_size_y_mm / camera.image_size_y_px
 
-    # return np.array([camera.fx * pixel_to_mm_x, camera.fy * pixel_to_mm_y])
+    return np.array([camera.fx * pixel_to_mm_x, camera.fy * pixel_to_mm_y])
 
 def project_world_point_to_image(camera: Camera, point: np.ndarray) -> np.ndarray:
     """Project a 3D world point into the image coordinates.
