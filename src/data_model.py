@@ -56,4 +56,8 @@ class Waypoint:
     """
     Waypoints are positions where the drone should fly to and capture a photo.
     """
-    pass
+    X: float              
+    Y: float               
+    Z: float
+    speed: float            # max speed the drone should fly at this point
+    # angle: float = 0.0      # camera angle (default to 0 for Nadir scans)

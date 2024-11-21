@@ -1,5 +1,4 @@
 import typing as T
-import math
 
 import numpy as np
 
@@ -108,4 +107,54 @@ def generate_photo_plan_on_grid(camera: Camera, dataset_spec: DatasetSpec) -> T.
         List[Waypoint]: scan plan as a list of waypoints.
 
     """
-    raise NotImplementedError()
+    x_dist, y_dist = compute_distance_between_images(camera, dataset_spec)
+
+    scan_dimension_x, scan_dimension_y = dataset_spec.scan_dimension_x, dataset_spec.scan_dimension_y
+
+
+    num_images_x = int(np.ceil(scan_dimension_x / x_dist))
+    num_images_y = int(np.ceil(scan_dimension_y / y_dist))
+
+    waypoints = []
+    z = dataset_spec.height
+    speed = compute_speed_during_photo_capture(camera, dataset_spec)
+
+    for j in range (num_images_y):
+        for i in range(num_images_x):
+            x = i * x_dist
+            y = j * y_dist
+            waypoints.append(Waypoint(x, y, z, speed))
+    
+    return waypoints
+
+
+def approximate_time(camera: Camera, dataset_spec: DatasetSpec, waypoints: list, max_speed: float, a_max: float):
+    imag_dist = compute_distance_between_images(camera, dataset_spec)[0]
+
+    photo_speed = waypoints[0].speed
+    time_to_next_waypoint = 0       # time take from end of one waypoint to the next begining of the waypoint
+
+    # distance for drone to accelerate from photo speed to max speed
+    dist_to_max_speed = (max_speed - photo_speed) * ((max_speed - photo_speed) / a_max )  
+
+
+    # Triangle
+    if imag_dist <= 2 * dist_to_max_speed:
+        distance = imag_dist / 2
+
+        # find the speed at the half way of the distance, we need another half distance to deccelerate
+        # I used one of the kinematic equation: v_f ** 2 = v_i ** 2 + 2*a*d
+        # to find highest speed the drone can reach
+        speed_at_max = np.sqrt(photo_speed**2 + 2 * a_max * distance)
+        time_to_next_waypoint = 2 * (speed_at_max - photo_speed) / a_max
+
+    else:   # Trapezoid
+        accelerate_time = (max_speed - photo_speed) / a_max     # time for drone to accelerate to it's max speed
+        dist_at_max_speed = imag_dist - 2 * dist_to_max_speed   # distance drone fly at the max speed
+        time_at_max_speed = dist_at_max_speed / max_speed       # time maintain in the max speed
+
+        time_to_next_waypoint = 2 * accelerate_time + time_at_max_speed
+    
+    time_photo = dataset_spec.exposure_time_ms / 1000   # time to take 1 photo in second
+    n = len(waypoints)
+    return n * time_photo + (n-1) * time_to_next_waypoint   # time to take n photos and n-1 movement between those photos
