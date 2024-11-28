@@ -119,11 +119,18 @@ def generate_photo_plan_on_grid(camera: Camera, dataset_spec: DatasetSpec) -> T.
     z = dataset_spec.height
     speed = compute_speed_during_photo_capture(camera, dataset_spec)
 
-    for j in range (num_images_y):
+    for j in range(num_images_y):
+        row_waypoints = []
         for i in range(num_images_x):
             x = i * x_dist
             y = j * y_dist
-            waypoints.append(Waypoint(x, y, z, speed))
+            row_waypoints.append(Waypoint(x, y, z, speed))
+        
+        # Reverse row order for alternating rows to create the lawnmower pattern
+        if j % 2 == 1:
+            row_waypoints.reverse()
+        
+        waypoints.extend(row_waypoints)
     
     return waypoints
 
@@ -135,7 +142,9 @@ def approximate_time(camera: Camera, dataset_spec: DatasetSpec, waypoints: list,
     time_to_next_waypoint = 0       # time take from end of one waypoint to the next begining of the waypoint
 
     # distance for drone to accelerate from photo speed to max speed
-    dist_to_max_speed = (max_speed - photo_speed) * ((max_speed - photo_speed) / a_max )  
+    dist_to_max_speed = (max_speed - photo_speed) ** 2 / (2 * a_max)
+
+    achievable_speed = max_speed
 
 
     # Triangle
@@ -145,8 +154,8 @@ def approximate_time(camera: Camera, dataset_spec: DatasetSpec, waypoints: list,
         # find the speed at the half way of the distance, we need another half distance to deccelerate
         # I used one of the kinematic equation: v_f ** 2 = v_i ** 2 + 2*a*d
         # to find highest speed the drone can reach
-        speed_at_max = np.sqrt(photo_speed**2 + 2 * a_max * distance)
-        time_to_next_waypoint = 2 * (speed_at_max - photo_speed) / a_max
+        achievable_speed = np.sqrt(photo_speed**2 + 2 * a_max * distance)
+        time_to_next_waypoint = 2 * (achievable_speed - photo_speed) / a_max
 
     else:   # Trapezoid
         accelerate_time = (max_speed - photo_speed) / a_max     # time for drone to accelerate to it's max speed
@@ -155,6 +164,12 @@ def approximate_time(camera: Camera, dataset_spec: DatasetSpec, waypoints: list,
 
         time_to_next_waypoint = 2 * accelerate_time + time_at_max_speed
     
-    time_photo = dataset_spec.exposure_time_ms / 1000   # time to take 1 photo in second
+    # Time to take a single photo in seconds
+    time_photo = dataset_spec.exposure_time_ms / 1000.0
+
+    # Total time to capture all photos and move between waypoints
     n = len(waypoints)
-    return n * time_photo + (n-1) * time_to_next_waypoint   # time to take n photos and n-1 movement between those photos
+    total_time = n * time_photo + (n - 1) * time_to_next_waypoint
+
+
+    return total_time, achievable_speed  
